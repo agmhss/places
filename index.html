@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Virtual Tour Guide — English / தமிழ்</title>
+  <style>
+    :root{
+      --bg:#060b1a; --card:#0c1534; --card2:#0a112a;
+      --txt:#e8eeff; --muted:#a9b6e6; --accent:#4f7cff; --accent2:#ff8a3d;
+      --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    }
+    *{box-sizing:border-box; margin:0; padding:0;}
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1200px 700px at 20% 0%, #122463 0%, var(--bg) 50%, #030613 100%);
+      color:var(--txt);
+      min-height:100vh;
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:18px;}
+    .topbar{
+      display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px; padding:14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      margin-bottom:20px;
+    }
+    h1{font-size:18px; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:13px; margin-top:4px}
+    .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+    input[type="text"]{
+      width:min(420px, 92vw);
+      padding:12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      color:var(--txt);
+      outline:none;
+      font-size:16px;
+    }
+    input[type="text"]::placeholder{color:rgba(232,238,255,.55)}
+    select{
+      padding:12px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06); color:var(--txt); outline:none; font-size:16px;
+    }
+    .btn{
+      padding:12px 16px; border-radius:12px; border:0; cursor:pointer; font-weight:600;
+      background:rgba(255,255,255,.10); color:var(--txt);
+      border:1px solid rgba(255,255,255,.12);
+      transition:.15s transform, .15s opacity;
+      user-select:none; font-size:15px; min-width:80px;
+    }
+    .btn:hover{transform: translateY(-1px); opacity:.95}
+    .btn:active{transform:translateY(0)}
+    .btn.primary{background:linear-gradient(180deg, rgba(79,124,255,.95), rgba(79,124,255,.75)); border-color:rgba(79,124,255,.55)}
+    .btn.pause{background:linear-gradient(180deg, rgba(255,138,61,.95), rgba(255,138,61,.70)); border-color:rgba(255,138,61,.50)}
+    .btn.reset{background:rgba(239,68,68,.18); border-color:rgba(239,68,68,.45)}
+
+    @media (max-width: 980px){
+      .controls{justify-content:center; width:100%}
+      input[type="text"]{width:100%}
+    }
+    @media (max-width: 480px){
+      .topbar{flex-direction:column; align-items:stretch}
+      .controls{flex-direction:column}
+      .btn{width:100%}
+    }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .viewer{
+      position:relative; height:70vh; min-height:400px; background:#000;
+      display:flex; align-items:center; justify-content:center; overflow:hidden;
+    }
+    @media (max-width: 768px){
+      .viewer{height:65vh}
+    }
+    @media (max-width: 480px){
+      .viewer{height:60vh}
+    }
+    .slide{
+      position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+      opacity:0; transition:opacity 1s ease;
+      filter:saturate(1.05) contrast(1.03);
+    }
+    .slide.active{opacity:1}
+    .overlay{
+      position:absolute; left:0; right:0; bottom:0;
+      padding:20px;
+      background: linear-gradient(180deg, transparent, rgba(0,0,0,.85));
+      pointer-events:none;
+    }
+    .placeTitle{font-size:28px; font-weight:800; margin-bottom:8px}
+    .meta{color:rgba(232,238,255,.85); font-size:15px; line-height:1.5}
+    .badgeRow{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+    .badge{
+      font-size:13px; color:rgba(232,238,255,.95);
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.09);
+      padding:7px 14px; border-radius:999px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Virtual Tour Guide — English / தமிழ்</h1>
+        <div class="sub">Type a place (e.g., “Taj Mahal”, “Madurai Meenakshi Temple”, “Eiffel Tower”) → Start ▶︎</div>
+      </div>
+      <div class="controls">
+        <input id="placeInput" type="text" placeholder="Enter a place to visit (Taj Mahal)..." />
+        <select id="langSelect" title="Language">
+          <option value="en" selected>English</option>
+          <option value="ta">தமிழ்</option>
+        </select>
+        <button class="btn primary" id="startBtn">Start ▶︎</button>
+        <button class="btn pause" id="pauseBtn">Pause ⏸</button>
+        <button class="btn reset" id="resetBtn">Reset ↺</button>
+      </div>
+    </div>
+    <div class="grid">
+      <!-- Left: slides / “virtual tour” viewer -->
+      <div class="card">
+        <div class="viewer" id="viewer">
+          <!-- slides injected here -->
+          <div class="overlay">
+            <div class="placeTitle" id="placeTitle">Ready for a tour!</div>
+            <div class="meta" id="metaLine">Tip: If voice doesn’t play, click anywhere once (browser permission).</div>
+            <div class="badgeRow" id="badgeRow"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<script>
+const els = {
+  input: document.getElementById('placeInput'),
+  lang: document.getElementById('langSelect'),
+  start: document.getElementById('startBtn'),
+  pause: document.getElementById('pauseBtn'),
+  reset: document.getElementById('resetBtn'),
+  viewer: document.getElementById('viewer'),
+  title: document.getElementById('placeTitle'),
+  meta: document.getElementById('metaLine'),
+  badges: document.getElementById('badgeRow'),
+};
+
+let state = {
+  running: false,
+  paused: false,
+  slides: [],
+  slideIndex: 0,
+  slideTimer: null,
+  secondsPerSlide: 6,
+  currentUtterance: null,
+  voices: [],
+  lastNarrationText: "",
+  lastPlace: "",
+};
+// ---------- Utilities ----------
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function cleanPlace(s){ return (s||"").trim().replace(/\s+/g,' '); }
+function setDot(el, mode){
+  el.classList.remove('live','off');
+  if(mode === 'live') el.classList.add('live');
+  else if(mode === 'off') el.classList.add('off');
+}
+function setBadges(items){
+  els.badges.innerHTML = "";
+  (items||[]).slice(0,6).forEach(t=>{
+    const b = document.createElement('div');
+    b.className = 'badge';
+    b.textContent = t;
+    els.badges.appendChild(b);
+  });
+}
+function stopSlideshow(){
+  if(state.slideTimer){ clearInterval(state.slideTimer); state.slideTimer = null; }
+}
+function stopTTS(){
+  try{
+    window.speechSynthesis.cancel();
+  }catch(e){}
+  state.currentUtterance = null;
+}
+// ---------- Voice (TTS) ----------
+function pickVoice(lang){
+  // Prefer Indian voices if available.
+  const voices = state.voices || [];
+  const wants = (lang === 'ta')
+    ? ['ta-IN','ta','Tamil']
+    : ['en-IN','en-GB','en-US','en','English'];
+  // Exact language match
+  for (const want of wants){
+    const v = voices.find(v => (v.lang||"").toLowerCase().startsWith(want.toLowerCase()));
+    if(v) return v;
+  }
+  // Fallback by name
+  for (const want of wants){
+    const v = voices.find(v => (v.name||"").toLowerCase().includes(want.toLowerCase()));
+    if(v) return v;
+  }
+  return voices[0] || null;
+}
+function updateVoiceUI(){
+  const v = pickVoice(els.lang.value);
+  if(!v){
+    els.voiceInfo.textContent = "No voices found on this device/browser.";
+    setDot(els.ttsDot,'off');
+    els.ttsStatus.textContent = "Voice: unavailable";
+    return;
+  }
+  els.voiceInfo.textContent = `${v.name} (${v.lang})`;
+  setDot(els.ttsDot,'live');
+  els.ttsStatus.textContent = "Voice: ready";
+}
+function speak(text){
+  stopTTS();
+  if(!text || !text.trim()) return;
+  const u = new SpeechSynthesisUtterance(text);
+  const v = pickVoice(els.lang.value);
+  if(v) u.voice = v;
+  u.rate = 1.0;
+  u.pitch = 1.0;
+  state.currentUtterance = u;
+  try{
+    window.speechSynthesis.speak(u);
+  }catch(e){
+    console.warn("Speech failed:", e);
+  }
+}
+// Some browsers load voices async
+function loadVoices(){
+  state.voices = window.speechSynthesis.getVoices();
+  updateVoiceUI();
+}
+// ---------- Wikipedia / Wikimedia fetch ----------
+async function fetchWikiSummary(place, lang){
+  // Wikipedia REST Summary endpoint
+  // Example: https://en.wikipedia.org/api/rest_v1/page/summary/Taj_Mahal
+  const safeTitle = encodeURIComponent(place.replace(/ /g,'_'));
+  const wiki = (lang === 'ta') ? 'https://ta.wikipedia.org' : 'https://en.wikipedia.org';
+  const url = `${wiki}/api/rest_v1/page/summary/${safeTitle}`;
+  const res = await fetch(url, { headers: { 'accept': 'application/json' } });
+  if(!res.ok) throw new Error(`Wikipedia summary not found (${res.status})`);
+  const data = await res.json();
+  const title = data.title || place;
+  const extract = data.extract || "";
+  const pageUrl = data.content_urls?.desktop?.page || data.content_urls?.mobile?.page || "";
+  return { title, extract, pageUrl, langUsed: lang };
+}
+async function fetchWikiImages(place, lang){
+  // MediaWiki API to get images + thumbnails from Wikimedia
+  // We'll try to request pageimages thumbnail + a few file images.
+  const wiki = (lang === 'ta') ? 'https://ta.wikipedia.org' : 'https://en.wikipedia.org';
+  const title = place.replace(/ /g,'_');
+  // 1) Try pageimages (lead thumbnail)
+  const pageImgUrl = `${wiki}/w/api.php?action=query&origin=*&format=json&prop=pageimages&piprop=thumbnail&pithumbsize=1400&titles=${encodeURIComponent(title)}`;
+  const r1 = await fetch(pageImgUrl);
+  const j1 = await r1.json();
+  const pages1 = j1?.query?.pages ? Object.values(j1.query.pages) : [];
+  const thumb = pages1[0]?.thumbnail?.source || null;
+  // 2) Try images list then get imageinfo urls
+  const listUrl = `${wiki}/w/api.php?action=query&origin=*&format=json&prop=images&imlimit=12&titles=${encodeURIComponent(title)}`;
+  const r2 = await fetch(listUrl);
+  const j2 = await r2.json();
+  const pages2 = j2?.query?.pages ? Object.values(j2.query.pages) : [];
+  const images = (pages2[0]?.images || []).map(x => x.title).filter(Boolean);
+  let imgUrls = [];
+  if(images.length){
+    // Get direct URLs (with thumb width)
+    const titlesParam = images.slice(0,10).map(t=>t.replace(/ /g,'_')).join('|');
+    const infoUrl = `${wiki}/w/api.php?action=query&origin=*&format=json&prop=imageinfo&iiprop=url&iiurlwidth=1600&titles=${encodeURIComponent(titlesParam)}`;
+    const r3 = await fetch(infoUrl);
+    const j3 = await r3.json();
+    const pages3 = j3?.query?.pages ? Object.values(j3.query.pages) : [];
+    for(const p of pages3){
+      const ii = p?.imageinfo?.[0];
+      const u = ii?.thumburl || ii?.url;
+      if(u && /\.(jpg|jpeg|png|webp)$/i.test(u)) imgUrls.push(u);
+    }
+  }
+  // Put thumb first (if exists), then unique others
+  const all = [thumb, ...imgUrls].filter(Boolean);
+  const uniq = [];
+  const seen = new Set();
+  for(const u of all){
+    if(!seen.has(u)){ seen.add(u); uniq.push(u); }
+  }
+  return uniq.slice(0, 10);
+}
+// ---------- LibreTranslate fallback ----------
+async function translateWithLibre(text, toLang){
+  const endpoint = (els.ltUrl.value || "").trim();
+  if(!endpoint) throw new Error("No LibreTranslate endpoint set.");
+  // LibreTranslate API shape: {q, source, target, format}
+  const body = { q: text, source: "en", target: toLang, format: "text" };
+  const res = await fetch(endpoint, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error(`LibreTranslate error (${res.status})`);
+  const data = await res.json();
+  return data.translatedText || "";
+}
+// ---------- Optional open-source AI via Ollama ----------
+async function tryOllamaNarration(place, lang, wikiExtract){
+  // Ollama generate API (local): POST /api/generate {model, prompt, stream:false}
+  // We keep it simple and safe for schools.
+  const url = (els.ollamaUrl.value || "").trim();
+  if(!url) throw new Error("No Ollama URL.");
+  const prompt = (lang === 'ta')
+`நீ ஒரு பள்ளி மாணவர்களுக்கான (High School) வர்ச்சுவல் சுற்றுலா வழிகாட்டி.
+இடம்: ${place}
+பின்வற்றை எளிய தமிழில் எழுதவும்:
+1) 1–2 வரி ‘சூடு’ அறிமுகம்
+2) காலம்/அரசர்கள்/மக்கள்/கலாசாரம்/நாடு பற்றிய முக்கிய தகவல்கள் (குறிப்புகள்)
+3) 6 குறுகிய ஸ்லைடு-கேப்ஷன்கள் (ஒவ்வொரு கேப்ஷன் 1 வரி)
+4) முடிவில் 3 சிறிய வினாக்கள் (MCQ இல்லாமல்)
+ஆதாரச் சுருக்கம் (தேவைப்பட்டால் பயன்படுத்தவும்):
+${wikiExtract}
+`
+:
+`You are a friendly virtual tour guide for high school students.
+Place: ${place}
+Write in clear, engaging English:
+1) A 1–2 line warm intro
+2) Key points about era/history/people/culture/country (bullets)
+3) 6 short slide captions (one line each)
+4) End with 3 quick questions (not MCQ)
+Reference summary (use if helpful):
+${wikiExtract}
+`;
+  const payload = {
+    model: "llama3.1",
+    prompt,
+    stream: false
+  };
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error(`Ollama error (${res.status})`);
+  const data = await res.json();
+  const text = (data.response || "").trim();
+  if(!text) throw new Error("Empty AI response.");
+  return text;
+}
+// ---------- Slides / Tour playback ----------
+function renderSlides(urls){
+  // Remove old slides
+  const old = els.viewer.querySelectorAll('img.slide');
+  old.forEach(n => n.remove());
+  state.slides = (urls || []).map(u => ({ url: u }));
+  state.slideIndex = 0;
+  if(state.slides.length === 0){
+    // fallback background (no image)
+    els.viewer.style.background = "rgba(0,0,0,.25)";
+    return;
+  }
+  for (let i=0;i<state.slides.length;i++){
+    const img = document.createElement('img');
+    img.className = 'slide' + (i===0 ? ' active' : '');
+    img.src = state.slides[i].url;
+    img.alt = "slide";
+    els.viewer.insertBefore(img, els.viewer.firstChild);
+  }
+}
+function setActiveSlide(i){
+  const slides = [...els.viewer.querySelectorAll('img.slide')];
+  slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+}
+function startSlideshow(){
+  stopSlideshow();
+  if(state.slides.length <= 1) return;
+  state.slideTimer = setInterval(()=>{
+    if(!state.running || state.paused) return;
+    state.slideIndex = (state.slideIndex + 1) % state.slides.length;
+    setActiveSlide(state.slideIndex);
+  }, state.secondsPerSlide * 1000);
+}
+function studentFriendlyMeta(lang){
+  return (lang === 'ta')
+    ? "நீங்கள் பார்க்கும் படங்களைப் பார்த்துக்கொண்டே நான் விளக்கமாக சொல்லுவேன்."
+    : "Watch the images while I narrate the story like a guide.";
+}
+// ---------- Main tour flow ----------
+async function buildTour(place){
+  const lang = els.lang.value;
+  const placeClean = cleanPlace(place);
+  if(!placeClean) throw new Error(lang==='ta' ? "இடத்தின் பெயரை உள்ளிடுங்கள்." : "Please enter a place name.");
+  state.lastPlace = placeClean;
+  els.title.textContent = (lang==='ta') ? "ஏற்றுகிறது…" : "Loading…";
+  els.meta.textContent = (lang==='ta') ? "தயவு செய்து காத்திருக்கவும்…" : "Please wait…";
+  setBadges([]);
+  // 1) Try summary in selected language (Wikipedia)
+  let summary;
+  try{
+    summary = await fetchWikiSummary(placeClean, lang);
+  }catch(e){
+    // If Tamil summary fails, try English summary then translate (optional)
+    if(lang === 'ta'){
+      const en = await fetchWikiSummary(placeClean, 'en');
+      let taText = "";
+      try{
+        taText = await translateWithLibre(en.extract, 'ta');
+      }catch(_){
+        taText = ""; // Will fallback to English
+      }
+      summary = {
+        title: en.title,
+        extract: taText || en.extract,
+        pageUrl: en.pageUrl,
+        langUsed: taText ? 'ta' : 'en'
+      };
+    }else{
+      throw e;
+    }
+  }
+  // 2) Fetch images (try selected language, else English)
+  let imgs = [];
+  try{ imgs = await fetchWikiImages(placeClean, lang); }catch(e){}
+  if(imgs.length < 3 && lang !== 'en'){
+    try{ imgs = await fetchWikiImages(placeClean, 'en'); }catch(e){}
+  }
+  // Robust fallback: if still few images, search Wikimedia Commons
+  if(imgs.length < 3){
+    try{ imgs = await fetchCommonsImages(placeClean); }catch(e){}
+  }
+  // 3) Optional: use Ollama to make narration script (fallback to wiki extract)
+  let narrationText = "";
+  let usedAI = false;
+  try{
+    narrationText = await tryOllamaNarration(placeClean, lang, summary.extract);
+    usedAI = true;
+  }catch(e){
+    narrationText = summary.extract || "";
+    usedAI = false;
+  }
+  // 4) Update UI
+  els.title.textContent = summary.title || placeClean;
+  els.meta.innerHTML = `
+    ${studentFriendlyMeta(lang)}
+    ${summary.pageUrl ? ` • <a class="link" href="${summary.pageUrl}" target="_blank" rel="noopener">Open source article</a>` : ""}
+  `;
+  els.narration.textContent = narrationText || (lang==='ta' ? "உள்ளடக்கம் கிடைக்கவில்லை." : "No content found.");
+  els.sourceLine.textContent = usedAI
+    ? "Ollama (open-source AI) + Wikipedia/Wikimedia"
+    : "Wikipedia / Wikimedia (images)";
+  // Badges (simple + friendly)
+  const badgeSet = new Set();
+  badgeSet.add(lang==='ta' ? "History" : "History");
+  badgeSet.add(lang==='ta' ? "Culture" : "Culture");
+  badgeSet.add(lang==='ta' ? "Architecture" : "Architecture");
+  badgeSet.add(lang==='ta' ? "People" : "People");
+  badgeSet.add(lang==='ta' ? "Country" : "Country");
+  if(usedAI) badgeSet.add(lang==='ta' ? "AI Guide" : "AI Guide");
+  setBadges([...badgeSet]);
+  // AI status dot
+  setDot(els.aiDot, usedAI ? 'live' : 'off');
+  els.aiStatus.textContent = usedAI ? "AI: running (Ollama)" : "AI: not running (using Wikipedia)";
+  // Slides
+  renderSlides(imgs);
+  setActiveSlide(0);
+  // Speak narration
+  state.lastNarrationText = narrationText;
+  speak(narrationText);
+}
+async function fetchCommonsImages(place){
+  const wiki = 'https://commons.wikimedia.org';
+  const title = encodeURIComponent(place);
+  let imgUrls = [];
+  // Search for files (namespace 6)
+  const searchUrl = `${wiki}/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${title}&gsrlimit=12&prop=imageinfo&iiprop=url&iiurlwidth=1600&format=json&origin=*`;
+  const r = await fetch(searchUrl);
+  const j = await r.json();
+  const pages = j?.query?.pages ? Object.values(j.query.pages) : [];
+  for(const p of pages){
+    const ii = p?.imageinfo?.[0];
+    const u = ii?.thumburl || ii?.url;
+    if(u && /\.(jpg|jpeg|png|webp)$/i.test(u)) imgUrls.push(u);
+  }
+  return imgUrls.slice(0, 10);
+}
+function startTour(){
+  state.running = true;
+  state.paused = false;
+  els.pause.textContent = "Pause ⏸";
+  buildTour(els.input.value)
+    .then(()=>{
+      startSlideshow();
+    })
+    .catch(err=>{
+      const lang = els.lang.value;
+      els.title.textContent = lang==='ta' ? "பிழை" : "Error";
+      els.meta.textContent = lang==='ta'
+        ? "இடத்தின் பெயரைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்."
+        : "Check the place name and try again.";
+      els.narration.textContent = `${err?.message || err}`;
+      stopSlideshow();
+      stopTTS();
+    });
+}
+function togglePause(){
+  if(!state.running) return;
+  state.paused = !state.paused;
+  if(state.paused){
+    els.pause.textContent = "Resume ▶︎";
+    try{ window.speechSynthesis.pause(); }catch(e){}
+  }else{
+    els.pause.textContent = "Pause ⏸";
+    try{ window.speechSynthesis.resume(); }catch(e){}
+  }
+}
+function resetTour(){
+  state.running = false;
+  state.paused = false;
+  stopSlideshow();
+  stopTTS();
+  // Clear slides
+  const old = els.viewer.querySelectorAll('img.slide');
+  old.forEach(n => n.remove());
+  els.title.textContent = "Ready for a tour!";
+  els.meta.textContent = "Tip: If voice doesn’t play, click anywhere once (browser permission).";
+  els.narration.textContent = "Enter a place and press Start. I’ll fetch a short student-friendly tour story + images, then narrate with voice.";
+  setBadges([]);
+  setDot(els.aiDot,'off');
+  els.aiStatus.textContent = "AI: not running";
+}
+// ---------- Events ----------
+els.start.addEventListener('click', startTour);
+els.pause.addEventListener('click', togglePause);
+els.reset.addEventListener('click', resetTour);
+els.input.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') startTour();
+});
+els.lang.addEventListener('change', ()=>{
+  updateVoiceUI();
+  // If already touring, rebuild in new language immediately
+  if(state.running && state.lastPlace){
+    els.input.value = state.lastPlace;
+    startTour();
+  }
+});
+document.addEventListener('click', ()=>{
+  // Some browsers require a user gesture before speech works.
+  updateVoiceUI();
+}, { once:true });
+els.timingLine.textContent = `${state.secondsPerSlide} seconds per image`;
+// Load voices
+loadVoices();
+if (typeof speechSynthesis !== "undefined") {
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+</script>
+</body>
+</html> 
+
+This should now pull images reliably, even if Wikipedia page has none — it falls back to Wikimedia Commons search for high-res photos. Test with "Taj Mahal" or any place! 🚀
